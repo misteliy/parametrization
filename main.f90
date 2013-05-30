@@ -21,7 +21,7 @@ PROGRAM main
     integer, parameter :: maxiter=1e6
     integer :: j,k,irandom,t,irand
     !--------------------------------------------------------------
-    real(kind=dp),parameter :: pi=2*asin(1._dp),kcalmol=6.27509468713739E+02_dp,ev=27.2116_dp,ev_kcal=23.061
+    real(kind=dp),parameter :: pi=2*asin(1._dp),kcalmol=6.27509468713739E+02_dp,ev=27.2116_dp,ev_kcal=23.06035_dp
     INTEGER :: id,stoch1,stoch2,stoch3,stoch4,stoch5,s
     character(15) :: mol,mol_ref1,mol_ref2,mol_ref3,mol_ref4
     character(30) :: str,out_file,out_group
@@ -128,7 +128,7 @@ PROGRAM main
 !-----------------------------------------------------------------------
    allocate(f(mpisize),res_f(mpisize),res(mpisize))
    allocate(dummy(mpisize),log_dummy(mpisize))
-   allocate(timings(mpisize))
+   allocate(ener_converged(mpisize),timings(mpisize))
    f=0.0_dp    
    res_f=0._dp 
    res=0._dp
@@ -344,7 +344,8 @@ PROGRAM main
             h2o8s4_ref = res_f(h2o8s4_id)
             !-----------------calculate obj_fun--------------------
             write(*,*) '           !!! energy in kcalmol'
-            write(*,*) '           mol ','s1 ','s2 ','s3 ','s4 ','s5 ','ener       ','ener diff ','ref     ','error   ','converged'
+            write(*,*) '           mol ','s1 ','s2 ','s3 ','s4 ','s5 ','ener       ','ener diff ', &
+                                   'ref     ','error   ','converged',' time'
                     !---calcualte error difference----------------
                     do s=1,30
                           energy = (ener_ref(s)%stoch1*res_f(s) + &
@@ -375,8 +376,9 @@ PROGRAM main
             print *,'iteration =',i,'Elapsed real time = ', real ( t2 - t1 ) / real ( clock_rate )
             obj_f=sum(res)
             print *,'-----------------------------'
-            print *, 'task  ',trim(task),'  obj_f',obj_f,'nf',nf,'fmin',fmin,'state',opt_state
-            print *, 'energy error',sum(res(1:30)),'geo rmsd',res_f(35),'ea/ip error [kcal/mol]',res(32),res(33)
+            print *,'obj_f',obj_f,'nf',nf,'fmin',fmin,'state',opt_state,'task  ',trim(task)
+            print *,'-----------------------------'
+            print *,'energy error',sum(res(1:30)),'geo rmsd',res_f(35),'ea/ip error [kcal/mol]',res(32),res(33)
             print *,'-----------------------------'
 !            print *,'error in:            energy,   ip/ea,    dipole,      rmsd   '
 !            print *,'function =',f(1),f(2),f(3),f(4)

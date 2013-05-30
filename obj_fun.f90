@@ -128,15 +128,15 @@
 !      else  if  (INDEX (trim(adjustl(input_files(my_id))), 'geo_opt') .eq. 1) then 
 !      !--------------rmsd error-----------
 !          res(4)=rmsd_error
+      !---------------timings-----------------------------
+      call system_clock ( t2, clock_rate, clock_max )   
+      time(my_id) =  real ( t2 - t1 ) / real ( clock_rate ) 
 !=========================================================================
             call MPI_Reduce(f,dummy,mpisize,MPI_DOUBLE_PRECISION, MPI_SUM,0,mpi_master_worker_comm,ierr)
             call MPI_Reduce(time,dummy,mpisize,MPI_DOUBLE_PRECISION, MPI_SUM,0,mpi_master_worker_comm,ierr)
             call MPI_Reduce(converged,log_dummy,mpisize,MPI_LOGICAL, MPI_LAND,0,mpi_master_worker_comm,ierr)
 !=========================================================================
-
       call cp_destroy_fenv(env_id,ierr)
-      call system_clock ( t2, clock_rate, clock_max )   
-      time(my_id) =  real ( t2 - t1 ) / real ( clock_rate ) 
       deallocate(pos,pos1,time)
       deallocate(dummy,log_dummy,converged)
       end subroutine fun
