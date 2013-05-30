@@ -1,0 +1,31 @@
+#!/bin/bash
+mol_list=`cat "WATER27structures/mol_list.txt"`
+#dir=/harddisk/opt3/devel3
+dir=`pwd`
+#cd $dir
+for mol in $mol_list
+    do
+        name=$mol."inp"
+        cp $dir/template.inp $name
+        sed -i "1s,.*,@set COORD_FILE_NAME WATER27structures/"${mol}".xyz," $name
+        sed -i "2s,.*,@set LSD 0," $name
+        sed -i "3s,.*,@set CHARGE 0," $name
+        tmp=`echo "$mol" | grep m `
+        if [ "$tmp" != "" ] 
+            then 
+            sed -i "2s,.*,@set LSD 1," $name
+            sed -i "3s,.*,@set CHARGE -1," $name
+        fi
+        tmp=`echo "$mol" | grep p `
+        if [ "$tmp" != "" ] 
+            then 
+            sed -i "2s,.*,@set LSD 1," $name
+            sed -i "3s,.*,@set CHARGE 1," $name
+        fi
+        tmp=`echo "$mol" | grep H3OpH2O6OHm `
+        if [ "$tmp" != "" ] 
+            then 
+            sed -i "2s,.*,@set LSD 1," $name
+            sed -i "3s,.*,@set CHARGE 0," $name
+        fi
+    done

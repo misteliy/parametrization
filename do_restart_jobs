@@ -1,0 +1,32 @@
+jobfile='todi.job'
+iterations=20 
+  echo `pwd ` >> jobs.started
+  echo `pwd `
+  jobfiles=`ls slurm-* 2> /dev/null`
+  old_job_id=""
+  for file in $jobfiles
+  do
+    index=`expr index "$file" -`
+    index2=`expr index "$file" .`
+    len=$((${index2}-${index}))
+    old_job=`squeue -u misteliy | grep ${file:${index}:${len}} | awk '{print $1}'`
+    if [ ! -n "$old_job_id" ]
+    then
+      old_job_id=$old_job
+    fi
+  done
+  if [ ! -n "$old_job_id" ]
+  then
+    tmp=`sbatch ${jobfile}`
+    old_job_id=`echo "$tmp" | awk '{print $4}'`
+    echo "no old job, so start without dependency " $old_job_id
+    echo "day 1 $old_job_id " >> ../jobs.started
+  fi
+  for (( i=2; i<=$iterations; i++ ))
+  do
+    last_job=$old_job_id
+    tmp=`sbatch --dependency=afterany:${old_job_id} ${jobfile}`
+    old_job_id=`echo "$tmp" | awk '{print $4}'`
+    echo "day $i $old_job_id depend on $last_job " >> jobs.started
+    echo "day $i $old_job_id depend on $last_job "
+  done
