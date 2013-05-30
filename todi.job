@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --ntasks=36 
-#SBATCH --time=00:30:00
+#SBATCH --time=00:59:00
 #SBATCH --job-name="optim" 
 # #SBATCH --contiguous
 export GFORTRAN_UNBUFFERED_ALL=y

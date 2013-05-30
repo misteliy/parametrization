@@ -16,7 +16,7 @@ PROGRAM main
     LOGICAL :: master=.FALSE., incomplete_group =.FALSE.
     logical,allocatable :: ener_converged(:),log_dummy(:)
     integer,parameter :: n=16,num_inp=30
-    real(kind=dp),allocatable :: f(:),res_f(:),res(:),dummy(:)
+    real(kind=dp),allocatable :: f(:),res_f(:),res(:),dummy(:),timings(:)
     real(kind=dp) :: x(n),rand
     integer, parameter :: maxiter=1e6
     integer :: j,k,irandom,t,irand
@@ -28,7 +28,7 @@ PROGRAM main
     real(kind=dp) :: ref,stepr,energy
     integer,parameter    :: h2o_id=1,h3o_id=16,ohm_id=22,h2o8s4_id=11,h2o_eaip_id=31 ! Id of the array not MPI rank
     real(kind=dp) :: h2o8s4_ref,h2o_eaip_ref,h2o_ref,h3op_ref,ohm_ref
-    real(kind=dp),dimension(2),parameter :: ipea_ref = (/ 12.530_dp , 5.36_dp /)
+    real(kind=dp),dimension(2),parameter :: ipea_ref = (/ 12.61_dp  , 0.16_dp /)
     !--------------------------------------------------------------
     real(kind=dp),parameter  :: sampler=1._dp/(2._dp*sqrt(real(n))) 
     real(kind=dp) :: sampx(n),sr,tmpx(n),tmpx2(n)
@@ -126,11 +126,13 @@ PROGRAM main
     CALL MPI_Comm_rank(mpi_top_level_comm, mpirank, mpierror)
     IF(mpirank.EQ.mpisize-1) master = .TRUE. ! set master node
 !-----------------------------------------------------------------------
-   allocate(f(mpisize),res_f(mpisize),res(mpisize),dummy(mpisize))
-   allocate(ener_converged(mpisize),log_dummy(mpisize))
+   allocate(f(mpisize),res_f(mpisize),res(mpisize))
+   allocate(dummy(mpisize),log_dummy(mpisize))
+   allocate(timings(mpisize))
    f=0.0_dp    
    res_f=0._dp 
    res=0._dp
+   timings=0._dp
    ener_converged=.true.
    log_dummy=.true. 
    dummy=0._dp
@@ -332,6 +334,7 @@ PROGRAM main
             if (task(1:4).eq.'skip') res(1) = 1e9_dp 
             if (task(1:5).eq.'new_x') then
                 call MPI_Reduce(dummy,res_f,mpisize,MPI_DOUBLE_PRECISION, MPI_SUM,0,mpi_master_worker_comm,ierr)
+                call MPI_Reduce(dummy,timings,mpisize,MPI_DOUBLE_PRECISION, MPI_SUM,0,mpi_master_worker_comm,ierr)
                 call MPI_Reduce(log_dummy,ener_converged,mpisize,MPI_LOGICAL, MPI_LAND,0,mpi_master_worker_comm,ierr)
             !---------------energy references-------------------------------------------
             h2o_ref = res_f(h2o_id)
@@ -350,28 +353,30 @@ PROGRAM main
                           ener_ref(s)%stoch4*h2o_ref + & 
                           ener_ref(s)%stoch5*h2o8s4_ref)*kcalmol
                           res(s) = abs(energy-ener_ref(s)%ref)
-                          write(*,'(A15,1X,I2,1X,I1,1X,I1,1X,I2,1X,I2,F10.2,F10.2,F10.2,1X,F10.2,1X,L1)') &
+                          write(*,'(A15,1X,I2,1X,I1,1X,I1,1X,I2,1X,I2,F10.2,F10.2,F10.2,1X,F10.2,1X,L1,1X,F10.2)') &
                           trim(ener_ref(s)%mol),ener_ref(s)%stoch1,ener_ref(s)%stoch2, &
                           ener_ref(s)%stoch3,ener_ref(s)%stoch4,ener_ref(s)%stoch5,res_f(s)*kcalmol, &
-                          energy,ener_ref(s)%ref,res(s),ener_converged(s)
+                          energy,ener_ref(s)%ref,res(s),ener_converged(s),timings(s)
                     end do
                     !print *,'res',res
                     !---calculate ea/ip---------------------------- 
-                    print *,'h2o  ',res_f(31)
-                    res(32) = (abs(res_f(32)-h2o_eaip_ref)*eV-ipea_ref(2))*ev_kcal
-                    print *,'h2o_n',res_f(32),res(32),'kcalmol'
-                    res(33) = (abs(res_f(33)-h2o_eaip_ref)*eV-ipea_ref(1))*ev_kcal
-                    print *,'h2o_p',res_f(33),res(33),'kcalmol'
-                    !---calculate rmsd---------------------------- 
+                    print *,'h2o  ',res_f(31),'time',timings(31)
+                    res(32) = abs(abs(res_f(32)-h2o_eaip_ref)*eV-ipea_ref(2))*ev_kcal
+                    print *,'h2o_n',res_f(32),abs(res_f(32)-h2o_eaip_ref)*eV,'[eV]',res(32),'error in [kcalmol]','time',timings(32)
+                    res(33) = abs(abs(res_f(33)-h2o_eaip_ref)*eV-ipea_ref(1))*ev_kcal
+                    print *,'h2o_p',res_f(33),abs(res_f(33)-h2o_eaip_ref)*eV,'[eV]',res(33),'error in [kcalmol]','time',timings(33)
+                    !---calculate rmsd----------------------------
+                    print *,'rmsd',res_f(35),'time',timings(35) 
                     !---calculate dipole--------------------------
             endif
             !------------------------------------------------------
             call system_clock ( t2, clock_rate, clock_max )            
             print *,'-----------------------------'
             print *,'iteration =',i,'Elapsed real time = ', real ( t2 - t1 ) / real ( clock_rate )
-            obj_f=sum(res(1:30))
+            obj_f=sum(res)
             print *,'-----------------------------'
-            print *, 'task  ',trim(task),'  obj_f',obj_f,'geo rmsd',res_f(35),'nf',nf,'fmin',fmin,'state',opt_state
+            print *, 'task  ',trim(task),'  obj_f',obj_f,'nf',nf,'fmin',fmin,'state',opt_state
+            print *, 'energy error',sum(res(1:30)),'geo rmsd',res_f(35),'ea/ip error [kcal/mol]',res(32),res(33)
             print *,'-----------------------------'
 !            print *,'error in:            energy,   ip/ea,    dipole,      rmsd   '
 !            print *,'function =',f(1),f(2),f(3),f(4)

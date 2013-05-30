@@ -29,7 +29,7 @@
       integer              :: mpi_master_worker_comm,mpi_worker_comm,mpi_worker_worker_comm
       integer,parameter    :: h2o_id=0,h3o_id=15,ohm_id=21,h2o8s4_id=10,h2o_eaip_id=30
       real(kind=dp) :: f(:),dummy2,energy
-      real(kind=dp),allocatable :: res(:),dummy(:)
+      real(kind=dp),allocatable :: res(:),dummy(:),time(:)
       real(kind=dp) :: x(n),a,temp,rnd,h2o_ref,h2o_eaip_ref,h3op_ref,ohm_ref,h2o8s4_ref
       real(kind=dp) :: z(n),M(n,n),tmp
       real(kind=dp),dimension(3,3) :: dipole
@@ -47,15 +47,18 @@
       logical :: calc_g = .false.
       real(dp),dimension(:,:),allocatable :: g 
       real(dp)  :: rmsd_error,ipea_error(2),ipea_ref(2) 
-
+ !------------------timing----------------------------------------
+      integer :: t1,t2,clock_rate,clock_max
       
       CALL MPI_Comm_size(mpi_comm_world, mpisize, mpierror)
-      allocate(dummy(mpisize),converged(mpisize),log_dummy(mpisize))
+      allocate(dummy(mpisize),log_dummy(mpisize))
+      allocate(time(mpisize),converged(mpisize))
       converged=.true.
       log_dummy=.true.
       f=0._dp
       rmsd_error=0._dp
       ipea_error=0._dp
+      time=0._dp
 !----------------------------initialize fore env-------------------------      
       write(out_group,*) group 
       out_group=adjustl(out_group)
@@ -68,6 +71,8 @@
         STOP "cp_create_fenv"
       ENDIF 
 !==========================worker caluculations========================     
+      call system_clock ( t1, clock_rate, clock_max )
+      
       CALL cp_get_natom(env_id, i, ierr)
       CALL cp_get_nparticle(env_id, j, ierr)
       allocate(pos(3*j))
@@ -102,6 +107,7 @@
         print *,"my bad",group
         STOP "cp_calc_energy"
       ENDIF
+   
 !==========================main iteration end==============================
 !      IF (ierr.NE.0) STOP "cp_destroy_fenv"
 !      ! TO BE CHANGED !!!!!!!!!!! STOICHMOETRIC CORRECTNESS
@@ -124,11 +130,14 @@
 !          res(4)=rmsd_error
 !=========================================================================
             call MPI_Reduce(f,dummy,mpisize,MPI_DOUBLE_PRECISION, MPI_SUM,0,mpi_master_worker_comm,ierr)
+            call MPI_Reduce(time,dummy,mpisize,MPI_DOUBLE_PRECISION, MPI_SUM,0,mpi_master_worker_comm,ierr)
             call MPI_Reduce(converged,log_dummy,mpisize,MPI_LOGICAL, MPI_LAND,0,mpi_master_worker_comm,ierr)
 !=========================================================================
 
       call cp_destroy_fenv(env_id,ierr)
-      deallocate(pos,pos1)
+      call system_clock ( t2, clock_rate, clock_max )   
+      time(my_id) =  real ( t2 - t1 ) / real ( clock_rate ) 
+      deallocate(pos,pos1,time)
       deallocate(dummy,log_dummy,converged)
       end subroutine fun
 !--------------------------------------------------------------------------
